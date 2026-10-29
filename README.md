@@ -1,69 +1,101 @@
-# Data Engineering HW05 — Apache Kafka
+cd ~/Documents/goit-de-hw-05
 
-IoT sensor monitoring system using Python and Apache Kafka.
+cat > README.md <<'EOF'
+# Домашнє завдання №5 — Apache Kafka
 
-## Overview
+## Мета
 
-The application simulates IoT sensors that continuously send
-temperature and humidity measurements to Kafka.
+Реалізувати потокову обробку даних IoT-датчиків за допомогою Apache Kafka: генерацію показників температури та вологості, фільтрацію за визначеними порогами, публікацію сповіщень і зчитування результатів.
 
-A separate processor analyzes incoming measurements and
-publishes alerts when predefined thresholds are exceeded.
-
-## Components
-
-- docker-compose.yml — Kafka broker configuration
-- check_topics.py — Kafka topic verification
-- sensor_producer.py — IoT sensor data generation
-- alert_processor.py — data filtering and alert generation
-- alert_consumer.py — reading and displaying alerts
-
-## Kafka Topics
-
-- anna_malkova_building_sensors
-- anna_malkova_temperature_alerts
-- anna_malkova_humidity_alerts
-
-## Alert Conditions
-
-- Temperature > 40°C
-- Humidity > 80%
-- Humidity < 20%
-
-## Technologies
+## Технології
 
 - Python 3.13
 - Apache Kafka 4.1.2
 - Docker Compose
 - kafka-python 3.0.12
 
-## Running
+## 1. Створення Kafka-топіків
 
-Start Kafka:
+Створено три топіки з унікальним префіксом `anna_malkova`:
 
-    docker compose up -d
+- `anna_malkova_building_sensors` — вхідні дані датчиків.
+- `anna_malkova_temperature_alerts` — температурні сповіщення.
+- `anna_malkova_humidity_alerts` — сповіщення про вологість.
 
-Install dependencies:
+Наявність топіків перевірено через `KafkaAdminClient.list_topics()` у `check_topics.py`.
 
-    pip install -r requirements.txt
+![Створення та перевірка трьох топіків](screenshots/p1_topics.png)
 
-Verify topics:
+## 2. Генерація даних IoT-датчиків
 
-    python check_topics.py
+Скрипт `sensor_producer.py` імітує роботу окремого датчика.
 
-Start sensor producers in separate terminals:
+Кожен запуск отримує власний `sensor_id`, який залишається незмінним протягом роботи програми.
 
-    python sensor_producer.py
+Кожні дві секунди генерується повідомлення з такими полями:
 
-Start alert processing:
+- `sensor_id` — ідентифікатор датчика.
+- `timestamp` — час вимірювання.
+- `temperature` — випадкова температура від 25 до 45 °C.
+- `humidity` — випадкова вологість від 15 до 85%.
 
-    python alert_processor.py
+Дані надсилаються у топік `anna_malkova_building_sensors`.
 
-Start alert consumer:
+Для перевірки паралельної роботи запущено два екземпляри `sensor_producer.py` з різними ідентифікаторами.
 
-    python alert_consumer.py
+![Одночасна робота двох датчиків](screenshots/p2_two_sensors.png)
 
-## Results
+## 3. Отримання та фільтрація даних
 
-Execution screenshots for all five homework stages
-are available in the screenshots directory.
+Скрипт `alert_processor.py` зчитує повідомлення з топіка `anna_malkova_building_sensors` та перевіряє кожне вимірювання.
+
+Умови формування сповіщень:
+
+- Температура понад 40 °C.
+- Вологість понад 80%.
+- Вологість нижче 20%.
+
+Вимірювання, які не відповідають жодній із цих умов, не створюють сповіщень.
+
+У терміналі відображаються отримані повідомлення (`Received`) і результати фільтрації (`TEMPERATURE ALERT`, `HUMIDITY ALERT`).
+
+![Отримання та фільтрація повідомлень](screenshots/p3_filtering.png)
+
+## 4. Публікація сповіщень у Kafka
+
+Відфільтровані повідомлення надсилаються у відповідні топіки:
+
+- `anna_malkova_temperature_alerts` — якщо температура перевищує 40 °C.
+- `anna_malkova_humidity_alerts` — якщо вологість виходить за межі 20–80%.
+
+Кожне сповіщення містить:
+
+- Ідентифікатор датчика.
+- Час вимірювання.
+- Температуру та вологість.
+- Тип сповіщення.
+- Текст причини спрацювання.
+
+У логах `alert_processor.py` підтверджено відправлення повідомлень до обох вихідних топіків (`Sent to`).
+
+![Публікація температурних сповіщень та сповіщень про вологість](screenshots/p4_alerts_sent.png)
+
+## 5. Зчитування та відображення сповіщень
+
+Скрипт `alert_consumer.py` підписується на два топіки:
+
+- `anna_malkova_temperature_alerts`
+- `anna_malkova_humidity_alerts`
+
+Для кожного отриманого повідомлення виводяться назва топіка, `sensor_id`, час, температура, вологість, тип сповіщення та його опис.
+
+Перевірено отримання і температурних сповіщень, і сповіщень про вологість.
+
+![Зчитування та відображення сповіщень](screenshots/p5_alert_consumer.png)
+
+## Запуск проєкту
+
+### 1. Запуск Kafka
+
+```bash
+docker compose up -d
